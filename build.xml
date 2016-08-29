@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- Build file for Infobright java interfaces -->
+<project name="infobright-core" default="all" basedir=".">
+
+  <!-- Java Version we are compatible with -->
+  <property name="java.compat.version" value="1.5" />
+
+  <!-- project paths that don't change -->
+  <property name="src.core" location="src" />
+  <property name="src.test" location="test" />
+  <property name="build.dir" location="build" />
+  <property name="lib" location="lib" />
+
+  <!-- Import custom properties for this machine -->
+  <property file="${basedir}/local.properties" />
+  <property file="${basedir}/build.properties" />
+  <property name="build.classes" value="${build.dir}/classes" />
+  <property name="build.test" value="${build.dir}/test" />
+  <property name="build.docs" value="${build.dir}/javadoc" />
+
+  <!-- The compilation classpath -->
+  <path id="compile.classpath">
+    <fileset dir="${lib}">
+      <include name="swt.jar" />
+      <include name="log4j-1.2.8.jar" />
+    </fileset>
+  </path>
+
+  <!-- The test classpath -->
+  <path id="test.classpath">
+    <path refid="compile.classpath" />
+    <pathelement location="${build_core.classes}" />
+    <fileset dir="${lib}">
+      <include name="commons-lang-2.3.jar" />
+      <include name="mysql-connector-java-5.1.6-bin.jar" />
+      <include name="junit-4.4.jar" />
+    </fileset>
+  </path>
+
+  <!-- Clean: cleans compiled files and other temporary artifacts. -->
+  <target name="clean" description="Cleans compiled files and other temporary artifacts.">
+    <delete includeemptydirs="true">
+      <fileset dir="${build.dir}" />
+    </delete>
+  </target>
+
+  <target name="build" depends="jar" />
+  
+  <!-- create initial directories -->
+  <target name="init" description="set things up">
+    <mkdir dir="${build.dir}" />
+    <mkdir dir="${build.classes}" />
+    <mkdir dir="${build.test}" />
+  </target>
+
+  <!-- Compile the project. -->
+  <target name="compile" description="Compile the source code." depends="init">
+    <javac destdir="${build.classes}" target="${java.compat.version}" source="${java.compat.version}" debug="on" encoding="utf8" classpathref="compile.classpath">
+      <src path="${src.core}" />
+    </javac>
+    <copy file="README.txt" todir="${build.dir}" overwrite="true">
+      <filterset>
+        <filter token="INFOBRIGHT_CORE_JAR" value="${infobright_core.jar}"/>
+      </filterset>
+    </copy>
+  </target>
+
+  <!-- copy property files for messages -->
+  <target name="copy" depends="compile" description="copy images etc to classes directory" >
+    <echo>Copying message property files classes directory...</echo>
+    <copy todir="${build.classes}">
+      <fileset dir="${src.core}" includes="**/*properties"/>
+    </copy>
+  </target>
+
+  <!-- Compile the tests -->
+  <target name="compiletests" description="Compile junit tests" depends="init">
+    <javac destdir="${build.test}" target="${java.compat.version}" source="${java.compat.version}" debug="on" encoding="utf8">
+      <src path="${src.test}" />
+      <classpath>
+        <path refid="compile.classpath" />
+        <path refid="test.classpath" />
+        <pathelement location="${build.classes}" />
+      </classpath>
+    </javac>
+  </target>
+
+  <target name="jar" description="Package the jar files" depends="compile, copy">
+    <jar destfile="${build_core.jar}" manifest="src/MANIFEST.mf">
+      <fileset dir="${build.classes}" />
+      <fileset dir="${basedir}" includes="LICENSE.txt" />
+    </jar>
+  </target>
+
+  <!-- Run unit tests -->
+  <target name="test" depends="compile, compiletests" description="run JUnit tests">
+    <property file="test.properties" />
+    <junit printsummary="withOutAndErr" showoutput="yes" haltonfailure="no" dir="${basedir}" fork="yes" forkmode="once" errorproperty="tests.failed">
+      <sysproperty key="log4j.debug" value="false" />
+      <sysproperty key="log4j.configuration" value="${log4j.cfg}" />
+      <sysproperty key="db.host"     value="${db.host}" />
+      <sysproperty key="db.name"     value="${db.name}" />
+      <sysproperty key="db.port"     value="${db.port}" />
+      <sysproperty key="db.user"     value="${db.user}" />
+      <sysproperty key="db.password" value="${db.password}" />
+     
+      <!-- to pick up the infobright_jni.dll -->
+      <sysproperty key="java.library.path" value="${lib}" /> 
+
+      <classpath>
+        <path refid="test.classpath" />
+        <pathelement location="${build.test}" />
+        <pathelement location="${build.classes}" />
+      </classpath>
+      <formatter type="xml" />
+      <batchtest todir="${build.test}">
+        <fileset dir="${src.test}">
+          <include name="**/**Test.java" />
+          <exclude name="**/Abstract*.java" />
+        </fileset>
+      </batchtest>
+    </junit>
+    <junitreport todir="${build.test}">
+      <fileset dir="${build.test}">
+        <include name="TEST-*.xml" />
+      </fileset>
+      <report format="frames" todir="${build.test}" />
+    </junitreport>
+
+    <fail message="JUNIT test failed.  See reports in ${build.test} for more info." if="tests.failed" />
+  </target>
+
+  <!-- Javadoc -->
+  <target name="javadoc" depends="compile" description="Generates javadoc">
+    <javadoc destdir="${build.docs}" author="true" version="true" use="true" encoding="utf8">
+      <packageset dir="${src.core}" />
+      <classpath refid="compile.classpath" />
+    </javadoc>
+  </target>
+
+  <target name="src-dist" 
+    description="Generates the package for the Contributed Software page">
+    <zip destfile="${build_dist.zip}">
+      <fileset dir="${build.dir}" includes="${infobright_core.jar},README.txt,javadoc/**" />
+      <fileset dir="${basedir}" includes=".classpath,.project,lib/**,src/**,cpp/**,doc/**" />
+      <fileset dir="${basedir}" includes="build.properties,build.xml" />
+      <fileset dir="${basedir}" includes="LICENSE.txt" />
+    </zip>
+  </target>
+  
+  <target name="all" depends="clean, jar, javadoc, src-dist" />
+  
+</project>
